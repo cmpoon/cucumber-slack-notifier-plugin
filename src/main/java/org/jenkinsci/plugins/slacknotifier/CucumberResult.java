@@ -7,6 +7,8 @@ import org.apache.commons.lang.StringUtils;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import hudson.model.Run;
+
 public class CucumberResult {
 	final List<FeatureResult> featureResults;
 	final int passPercentage;
@@ -34,12 +36,11 @@ public class CucumberResult {
 		return this.featureResults;
 	}
 	
-	public String toSlackMessage(final String jobName,
-			final int buildNumber, final String channel, final String jenkinsUrl, final String extra) {
+	public String toSlackMessage(final Run<?,?> build, final String channel, final String jenkinsUrl, final String extra) {
 		final JsonObject json = new JsonObject();
 		json.addProperty("channel", "#" + channel);
-		addCaption(json, buildNumber, jobName, jenkinsUrl, extra);
-		json.add("fields", getFields(jobName, buildNumber, jenkinsUrl));
+		addCaption(json, build, jenkinsUrl, extra);
+		json.add("fields", getFields(build, jenkinsUrl));
 
 		if (getPassPercentage() == 100) {
 			addColourAndIcon(json, "good", ":thumbsup:");
@@ -49,25 +50,29 @@ public class CucumberResult {
 			addColourAndIcon(json, "danger", ":thumbsdown:");
 		}
 
-		json.addProperty("username", jobName);
+		json.addProperty("username", build.getParent().getDisplayName());
 		return json.toString();
 	}
 
-	private String getJenkinsHyperlink(final String jenkinsUrl, final String jobName, final int buildNumber) {
+	private String getJenkinsHyperlink(final String jenkinsUrl, final Run<?,?> build) {
 		StringBuilder s = new StringBuilder();
 		s.append(jenkinsUrl);
 		if (!jenkinsUrl.trim().endsWith("/")) {
 			s.append("/");
 		}
-		s.append("job/");
+		s.append(build.getUrl());
+		/**
+		Incompatible with Jenkins pipeline
+
 		s.append(jobName);
 		s.append("/");
 		s.append(buildNumber);
 		s.append("/");
+		*/
 		return s.toString();
 	}
 	
-	public String toHeader(final String jobName, final int buildNumber, final String jenkinsUrl, final String extra) {
+	public String toHeader(final Run<?,?> build , final String jenkinsUrl, final String extra) {
 		StringBuilder s = new StringBuilder();
 		if (StringUtils.isNotEmpty(extra)) {
 			s.append(extra);
@@ -77,15 +82,15 @@ public class CucumberResult {
 		s.append(", Scenarios: ");
 		s.append(getTotalScenarios());
 		s.append(", Build: <");
-		s.append(getJenkinsHyperlink(jenkinsUrl, jobName, buildNumber));
+		s.append(getJenkinsHyperlink(jenkinsUrl, build));
 		s.append("cucumber-html-reports/|");
-		s.append(buildNumber);
+		s.append(build.getNumber());
 		s.append(">");
 		return s.toString();
 	}
 	
-	private void addCaption(final JsonObject json, final int buildNumber, final String jobName, final String jenkinsUrl, final String extra) {
-		json.addProperty("pretext", toHeader(jobName, buildNumber, jenkinsUrl, extra));
+	private void addCaption(final JsonObject json, final Run<?,?> build, final String jenkinsUrl, final String extra) {
+		json.addProperty("pretext", toHeader(build, jenkinsUrl, extra));
 	}
 	
 	private void addColourAndIcon(JsonObject json, String good, String value) {
@@ -93,8 +98,8 @@ public class CucumberResult {
 		json.addProperty("icon_emoji", value);
 	}
 
-	private JsonArray getFields(final String jobName, final int buildNumber, final String jenkinsUrl) {
-		final String hyperLink = getJenkinsHyperlink(jenkinsUrl, jobName, buildNumber) + "cucumber-html-reports/";
+	private JsonArray getFields(final Run<?,?> build , final String jenkinsUrl) {
+		final String hyperLink = getJenkinsHyperlink(jenkinsUrl, build) + "cucumber-html-reports/";
 		final JsonArray fields = new JsonArray();
 		fields.add(shortTitle("Features"));
 		fields.add(shortTitle("Pass %"));

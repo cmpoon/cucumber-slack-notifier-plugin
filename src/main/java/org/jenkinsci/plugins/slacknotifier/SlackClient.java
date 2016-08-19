@@ -20,6 +20,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import hudson.ProxyConfiguration;
+import hudson.model.Run;
 import jenkins.model.Jenkins;
 
 public class SlackClient {
@@ -41,10 +42,10 @@ public class SlackClient {
 		this.hideSuccessfulResults = hideSuccessfulResults;
 	}
 
-	public void postToSlack(JsonElement results, final String jobName, final int buildNumber, final String extra) {
+	public void postToSlack(JsonElement results, final Run<?,?> build , final String extra) {
 		LOG.info("Publishing test report to slack channel: " + channel);
 		CucumberResult result = results == null ? dummyResults() : processResults(results);
-		String json = result.toSlackMessage(jobName, buildNumber, channel, jenkinsUrl, extra);
+		String json = result.toSlackMessage(build, channel, jenkinsUrl, extra);
 		postToSlack(json);
 	}
 
