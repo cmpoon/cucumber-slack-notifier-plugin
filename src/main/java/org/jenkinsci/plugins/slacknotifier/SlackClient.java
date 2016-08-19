@@ -6,14 +6,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.URIException;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.commons.httpclient.UsernamePasswordCredentials;
+import org.apache.commons.httpclient.auth.AuthScope;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
+import hudson.ProxyConfiguration;
+import jenkins.model.Jenkins;
 
 public class SlackClient {
 
@@ -55,12 +62,15 @@ public class SlackClient {
 	}
 
 	private void postToSlack(PostMethod postMethod) {
-		HttpClient http = new HttpClient();
 		try {
+			HttpClient http = this.getHttpClient(postMethod.getURI().getHost());
+			
 			int status = http.executeMethod(postMethod);
 			if (status != 200) {
 				throw new RuntimeException("Received HTTP Status code [" + status + "] while posting to slack");
 			}
+		} catch (URIException ex){
+			throw new RuntimeException("WebHook URI error", ex);
 		} catch (IOException e) {
 			throw new RuntimeException("Message could not be posted", e);
 		}
@@ -107,4 +117,45 @@ public class SlackClient {
 			throw new RuntimeException(ENCODING + " encoding is not supported with [" + json + "]", e);
 		}
 	}
+	
+
+	private HttpClient getHttpClient(String host) {
+		HttpClient client = new HttpClient();
+
+		client.getParams().setConnectionManagerTimeout(10 * 1000);
+		client.getParams().setSoTimeout(60 * 1000);
+
+		Jenkins jenkins = Jenkins.getInstance();
+		ProxyConfiguration proxy = null;
+		if (jenkins != null) {
+			proxy = jenkins.proxy;
+		}
+		if (proxy != null) {
+			LOG.info("Jenkins proxy: " + proxy.name + ":" + proxy.port);
+
+			boolean shouldProxy = true;
+			for (Pattern p : proxy.getNoProxyHostPatterns()) {
+				if (p.matcher(host).matches()) {
+					shouldProxy = false;
+					break;
+				}
+			}
+			
+			if (shouldProxy) {
+				client.getHostConfiguration().setProxy(proxy.name, proxy.port);
+				String username = proxy.getUserName();
+				String password = proxy.getPassword();
+				if (username != null && !"".equals(username.trim())) {
+					LOG.info("Using proxy authentication (user=" + username + ")");
+					client.getState().setProxyCredentials(AuthScope.ANY,
+							new UsernamePasswordCredentials(username, password));
+				}
+			}else{
+				LOG.info("-- No proxy matched. Proxy not used.");
+			}
+
+		}
+		return client;
+	}
+	
 }
