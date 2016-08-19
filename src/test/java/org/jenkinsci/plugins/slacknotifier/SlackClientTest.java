@@ -7,20 +7,33 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Arrays;
 
+import org.junit.Rule;
 import org.junit.Test;
+import org.jvnet.hudson.test.JenkinsRule;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.stream.JsonReader;
 
+import hudson.model.FreeStyleProject;
+import hudson.model.Run;
+
 public class SlackClientTest {
 
+	public @Rule JenkinsRule j = new JenkinsRule();
+
 	@Test
-	public void canGenerateFullSuccessfulSlackMessage() throws FileNotFoundException {
+	public void canGenerateFullSuccessfulSlackMessage() throws Exception {
+		
+		FreeStyleProject p = j.createFreeStyleProject("test-job");
+		p.scheduleBuild2(0);
+		Run<?,?> build = p.getBuildByNumber(1);
+				
 		JsonElement element = loadTestResultFile("successful-result.json");
 		assertNotNull(element);
 		CucumberResult result = new SlackClient("http://slack.com/", "http://jenkins:8080/", "channel", false).processResults(element);
@@ -30,13 +43,18 @@ public class SlackClientTest {
 		assertEquals(8, result.getTotalFeatures());
 		assertEquals(100, result.getPassPercentage());
 		
-		String slackMessage = result.toSlackMessage("test-job", 7, "channel", "http://jenkins:8080/", null);
+		String slackMessage = result.toSlackMessage(build, "channel", "http://jenkins:8080/", null);
 		assertNotNull(slackMessage);
-		assertTrue(slackMessage.contains("<http://jenkins:8080/job/test-job/7/cucumber-html-reports/validate_gerrit_home_page-feature.html|validate gerrit home page>"));
+		assertTrue(slackMessage.contains("<http://jenkins:8080/job/test-job/1/cucumber-html-reports/validate_gerrit_home_page-feature.html|validate gerrit home page>"));
 	}
 
 	@Test
-	public void canGenerateMinimalSuccessfulSlackMessage() throws FileNotFoundException {
+	public void canGenerateMinimalSuccessfulSlackMessage() throws Exception {
+		
+		FreeStyleProject p = j.createFreeStyleProject("test-job");
+		p.scheduleBuild2(0);
+		Run<?,?> build = p.getBuildByNumber(1);
+		
 		JsonElement element = loadTestResultFile("successful-result.json");
 		assertNotNull(element);
 		CucumberResult result = new SlackClient("http://slack.com/", "http://jenkins:8080/", "channel", true).processResults(element);
@@ -46,7 +64,7 @@ public class SlackClientTest {
 		assertEquals(0, result.getTotalFeatures());
 		assertEquals(100, result.getPassPercentage());
 
-		String slackMessage = result.toSlackMessage("test-job", 7, "channel", "http://jenkins:8080/", null);
+		String slackMessage = result.toSlackMessage(build, "channel", "http://jenkins:8080/", null);
 		assertNotNull(slackMessage);
 	}
 	
@@ -75,22 +93,37 @@ public class SlackClientTest {
 	}
 	
 	@Test
-	public void canGenerateGoodMessage() {
-		String slackMessage = successfulResult().toSlackMessage("test-job", 1, "channel", "http://jenkins:8080/", null);
+	public void canGenerateGoodMessage() throws Exception {
+		
+		FreeStyleProject p = j.createFreeStyleProject("test-job");
+		p.scheduleBuild2(0);
+		Run<?,?> build = p.getBuildByNumber(1);
+		
+		String slackMessage = successfulResult().toSlackMessage(build, "channel", "http://jenkins:8080/", null);
 		assertNotNull(slackMessage);
 		assertTrue(slackMessage.contains("good"));
 	}
 
 	@Test
-	public void canGenerateMarginalMessage() {
-		String slackMessage = marginalResult().toSlackMessage("test-job", 1, "channel", "http://jenkins:8080/", null);
+	public void canGenerateMarginalMessage() throws Exception {
+		
+		FreeStyleProject p = j.createFreeStyleProject("test-job");
+		p.scheduleBuild2(0);
+		Run<?,?> build = p.getBuildByNumber(1);
+		
+		String slackMessage = marginalResult().toSlackMessage(build, "channel", "http://jenkins:8080/", null);
 		assertNotNull(slackMessage);
 		assertTrue(slackMessage.contains("warning"));
 	}
 
 	@Test
-	public void canGenerateBadMessage() {
-		String slackMessage = badResult().toSlackMessage("test-job", 1, "channel", "http://jenkins:8080/", null);
+	public void canGenerateBadMessage() throws Exception {
+		
+		FreeStyleProject p = j.createFreeStyleProject("test-job");
+		p.scheduleBuild2(0);
+		Run<?,?> build = p.getBuildByNumber(1);
+		
+		String slackMessage = badResult().toSlackMessage(build, "channel", "http://jenkins:8080/", null);
 		assertNotNull(slackMessage);
 		assertTrue(slackMessage.contains("danger"));
 	}
